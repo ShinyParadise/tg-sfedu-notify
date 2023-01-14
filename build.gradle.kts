@@ -13,6 +13,12 @@ repositories {
 }
 
 dependencies {
+    val kotlinVersion = "1.7.21"
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
+
+    val tgbotVersion = "5.0.0"
+    implementation("dev.inmo:tgbotapi:$tgbotVersion")
+
     testImplementation(kotlin("test"))
 }
 
