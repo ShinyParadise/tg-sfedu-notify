@@ -6,6 +6,9 @@ import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onComman
 import dev.inmo.tgbotapi.requests.send.SendTextMessage
 import kotlinx.coroutines.flow.first
 import java.io.File
+import java.io.FileOutputStream
+import java.net.URL
+import java.nio.channels.Channels
 
 // Databases are for noobs
 private val users = mutableListOf<User>()
@@ -30,7 +33,34 @@ suspend fun main() {
             updateUserGroup(it.chat.id.toString(), group)
         }
 
+        onCommand("today_schedule", requireOnlyCommandInMessage = true) {
+            val userId = it.chat.id.toString()
+
+            if (isUserWithAGroup(userId)) {
+                val user = users.find { user -> user.id == userId }!!
+                val requestURL = URL(DOWNLOAD_CALENDAR_BASE_URL + user.group)
+
+                val outputFile = buildCalendarFileName(user.group)
+                if (File(outputFile).exists()) {
+                    // TODO: Implement parsing schedule and date
+                } else {
+                    downloadFile(url = requestURL, outputFileName = outputFile)
+                }
+            } else {
+                reply(it, "Ты не ввел свою группу, дурак. Используй команду /setgroup")
+            }
+        }
+
     }.join()
+}
+
+private fun isUserWithAGroup(userId: String): Boolean {
+    val existingUser = users.find { it.id == userId }
+    existingUser?.let {
+        return it.group.isNotBlank()
+    }
+
+    return false
 }
 
 private fun updateUserGroup(userId: String, group: String) {
@@ -40,4 +70,18 @@ private fun updateUserGroup(userId: String, group: String) {
     } else {
         existingUser.group = group
     }
+}
+
+private fun downloadFile(url: URL, outputFileName: String) {
+    url.openStream().use {
+        Channels.newChannel(it).use { rbc ->
+            FileOutputStream(outputFileName).use { fos ->
+                fos.channel.transferFrom(rbc, 0, Long.MAX_VALUE)
+            }
+        }
+    }
+}
+
+private fun buildCalendarFileName(groupName: String): String {
+    return "src/main/resources/calendar_$groupName.ics"
 }

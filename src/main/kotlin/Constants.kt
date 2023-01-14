@@ -1,0 +1,1 @@
+const val DOWNLOAD_CALENDAR_BASE_URL = "https://webictis.sfedu.ru/schedule-api/calendar/"
