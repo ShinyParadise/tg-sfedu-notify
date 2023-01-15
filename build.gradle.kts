@@ -19,6 +19,8 @@ dependencies {
     val tgbotVersion = "5.0.0"
     implementation("dev.inmo:tgbotapi:$tgbotVersion")
 
+    implementation("ical4j:ical4j:0.9.20")
+
     testImplementation(kotlin("test"))
 }
 

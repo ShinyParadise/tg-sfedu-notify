@@ -4,8 +4,13 @@ import dev.inmo.tgbotapi.extensions.behaviour_builder.buildBehaviourWithLongPoll
 import dev.inmo.tgbotapi.extensions.behaviour_builder.expectations.waitText
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onCommand
 import dev.inmo.tgbotapi.requests.send.SendTextMessage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import net.fortuna.ical4j.data.CalendarBuilder
+import net.fortuna.ical4j.model.Calendar
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.URL
 import java.nio.channels.Channels
@@ -40,12 +45,13 @@ suspend fun main() {
                 val user = users.find { user -> user.id == userId }!!
                 val requestURL = URL(DOWNLOAD_CALENDAR_BASE_URL + user.group)
 
-                val outputFile = buildCalendarFileName(user.group)
-                if (File(outputFile).exists()) {
-                    // TODO: Implement parsing schedule and date
-                } else {
-                    downloadFile(url = requestURL, outputFileName = outputFile)
+                val outputFileName = buildCalendarFileName(user.group)
+                if (!File(outputFileName).exists()) {
+                    downloadFile(url = requestURL, outputFileName = outputFileName)
                 }
+
+                val calendar = extractCalendar(outputFileName)
+                println(calendar.components)
             } else {
                 reply(it, "Ты не ввел свою группу, дурак. Используй команду /setgroup")
             }
@@ -80,6 +86,16 @@ private fun downloadFile(url: URL, outputFileName: String) {
             }
         }
     }
+}
+
+private suspend fun extractCalendar(outputFileName: String): Calendar {
+    val calendar = withContext(Dispatchers.IO) {
+        val calendarFile = FileInputStream(outputFileName)
+        val builder = CalendarBuilder()
+        return@withContext builder.build(calendarFile)
+    }
+
+    return calendar
 }
 
 private fun buildCalendarFileName(groupName: String): String {
