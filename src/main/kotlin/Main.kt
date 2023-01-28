@@ -1,14 +1,23 @@
 import dev.inmo.tgbotapi.extensions.api.send.reply
 import dev.inmo.tgbotapi.extensions.api.telegramBot
+import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.extensions.behaviour_builder.buildBehaviourWithLongPolling
 import dev.inmo.tgbotapi.extensions.behaviour_builder.expectations.waitText
 import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onCommand
 import dev.inmo.tgbotapi.requests.send.SendTextMessage
+import dev.inmo.tgbotapi.types.message.abstracts.CommonMessage
+import dev.inmo.tgbotapi.types.message.content.TextContent
+import models.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import models.CalendarEvent
 import net.fortuna.ical4j.data.CalendarBuilder
 import net.fortuna.ical4j.model.Calendar
+import utils.buildCalendarFileName
+import utils.buildRequestURL
+import utils.downloadFile
+import utils.extractCalendar
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -28,14 +37,13 @@ suspend fun main() {
         }
 
         onCommand("setgroup", requireOnlyCommandInMessage = true) {
-            val group = waitText(
-                SendTextMessage(
-                    it.chat.id,
-                    "Введи свою группу как в зачетке."
-                )
-            ).first().text
+            val group = waitForGroup(it)
 
             updateUserGroup(it.chat.id.toString(), group)
+            SendTextMessage(
+                it.chat.id,
+                "Теперь твоя группа - $group."
+            )
         }
 
         onCommand("today_schedule", requireOnlyCommandInMessage = true) {
@@ -43,22 +51,43 @@ suspend fun main() {
 
             if (isUserWithAGroup(userId)) {
                 val user = users.find { user -> user.id == userId }!!
-                val requestURL = URL(DOWNLOAD_CALENDAR_BASE_URL + user.group)
-
+                val requestURL = buildRequestURL(user)
                 val outputFileName = buildCalendarFileName(user.group)
+
                 if (!File(outputFileName).exists()) {
                     downloadFile(url = requestURL, outputFileName = outputFileName)
                 }
 
                 val calendar = extractCalendar(outputFileName)
-                println(calendar.components)
+                val events = calendar.components
+                val parsed = events.map { event -> convertToCalendarEvent(event) }
+
             } else {
-                reply(it, "Ты не ввел свою группу, дурак. Используй команду /setgroup")
+                SendTextMessage(
+                    it.chat.id,
+                    "Ты не ввел свою группу, дурак. Используй команду /setgroup"
+                )
             }
         }
 
     }.join()
 }
+
+private fun convertToCalendarEvent(event: Any?): CalendarEvent {
+    val begin = event.toString()
+    val end = event.toString()
+    val name = event.toString()
+
+    return CalendarEvent(name, begin, end)
+}
+
+private suspend fun BehaviourContext.waitForGroup(it: CommonMessage<TextContent>) =
+    waitText(
+        SendTextMessage(
+            it.chat.id,
+            "Введи свою группу как в зачетке."
+        )
+    ).first().text
 
 private fun isUserWithAGroup(userId: String): Boolean {
     val existingUser = users.find { it.id == userId }
@@ -76,28 +105,4 @@ private fun updateUserGroup(userId: String, group: String) {
     } else {
         existingUser.group = group
     }
-}
-
-private fun downloadFile(url: URL, outputFileName: String) {
-    url.openStream().use {
-        Channels.newChannel(it).use { rbc ->
-            FileOutputStream(outputFileName).use { fos ->
-                fos.channel.transferFrom(rbc, 0, Long.MAX_VALUE)
-            }
-        }
-    }
-}
-
-private suspend fun extractCalendar(outputFileName: String): Calendar {
-    val calendar = withContext(Dispatchers.IO) {
-        val calendarFile = FileInputStream(outputFileName)
-        val builder = CalendarBuilder()
-        return@withContext builder.build(calendarFile)
-    }
-
-    return calendar
-}
-
-private fun buildCalendarFileName(groupName: String): String {
-    return "src/main/resources/calendar_$groupName.ics"
 }
