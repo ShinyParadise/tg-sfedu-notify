@@ -7,22 +7,14 @@ import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onComman
 import dev.inmo.tgbotapi.requests.send.SendTextMessage
 import dev.inmo.tgbotapi.types.message.abstracts.CommonMessage
 import dev.inmo.tgbotapi.types.message.content.TextContent
-import models.User
-import kotlinx.coroutines.Dispatchers
+import dto.User
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
-import models.CalendarEvent
-import net.fortuna.ical4j.data.CalendarBuilder
-import net.fortuna.ical4j.model.Calendar
+import dto.CalendarEvent
 import utils.buildCalendarFileName
 import utils.buildRequestURL
 import utils.downloadFile
 import utils.extractCalendar
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.net.URL
-import java.nio.channels.Channels
 
 // Databases are for noobs
 private val users = mutableListOf<User>()
@@ -39,46 +31,54 @@ suspend fun main() {
         onCommand("setgroup", requireOnlyCommandInMessage = true) {
             val group = waitForGroup(it)
 
-            updateUserGroup(it.chat.id.toString(), group)
             SendTextMessage(
                 it.chat.id,
                 "Теперь твоя группа - $group."
             )
+            updateUserGroup(it.chat.id.toString(), group)
         }
 
         onCommand("today_schedule", requireOnlyCommandInMessage = true) {
-            val userId = it.chat.id.toString()
-
-            if (isUserWithAGroup(userId)) {
-                val user = users.find { user -> user.id == userId }!!
-                val requestURL = buildRequestURL(user)
-                val outputFileName = buildCalendarFileName(user.group)
-
-                if (!File(outputFileName).exists()) {
-                    downloadFile(url = requestURL, outputFileName = outputFileName)
-                }
-
-                val calendar = extractCalendar(outputFileName)
-                val events = calendar.components
-                val parsed = events.map { event -> convertToCalendarEvent(event) }
-
-            } else {
-                SendTextMessage(
-                    it.chat.id,
-                    "Ты не ввел свою группу, дурак. Используй команду /setgroup"
-                )
-            }
+            sendTodaySchedule(it)
         }
 
     }.join()
 }
 
-private fun convertToCalendarEvent(event: Any?): CalendarEvent {
-    val begin = event.toString()
-    val end = event.toString()
-    val name = event.toString()
+private suspend fun sendTodaySchedule(it: CommonMessage<TextContent>) {
+    val userId = it.chat.id.toString()
 
-    return CalendarEvent(name, begin, end)
+    if (isUserWithAGroup(userId)) {
+        val user = users.find { user -> user.id == userId }!!
+        val requestURL = buildRequestURL(user)
+        val outputFileName = buildCalendarFileName(user.group)
+
+        if (!File(outputFileName).exists()) {
+            downloadFile(url = requestURL, outputFileName = outputFileName)
+        }
+
+        val calendar = extractCalendar(outputFileName)
+        val events = calendar.components
+        val parsedEvents = events.map { event -> convertToCalendarEvent(event) }
+        for (item in parsedEvents) {
+            println(item)
+        }
+    } else {
+        SendTextMessage(
+            it.chat.id,
+            "Ты не ввел свою группу, дурак. Используй команду /setgroup"
+        )
+    }
+}
+
+private fun convertToCalendarEvent(event: Any?): CalendarEvent {
+    val strEvent = event.toString()
+
+    val name = strEvent.substringAfter("SUMMARY:").substringBefore("\r\n")
+    val begin = strEvent.substringAfter("DTSTART:").substringBefore("\r\n")
+    val end = strEvent.substringAfter("DTEND:").substringBefore("\r\n")
+
+    return CalendarEvent(name = name, begin = begin, end = end)
 }
 
 private suspend fun BehaviourContext.waitForGroup(it: CommonMessage<TextContent>) =

@@ -1,7 +1,7 @@
 package utils
 
 import DOWNLOAD_CALENDAR_BASE_URL
-import models.User
+import dto.User
 import java.io.FileOutputStream
 import java.net.URL
 import java.nio.channels.Channels

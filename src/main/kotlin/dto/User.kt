@@ -1,4 +1,4 @@
-package models
+package dto
 
 data class User(
     val id: String,

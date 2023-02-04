@@ -1,4 +1,4 @@
-package models
+package dto
 
 data class CalendarEvent(
     val name: String,
