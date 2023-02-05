@@ -86,3 +86,4 @@ replay_pid*
 
 local.*
 local.*/
+/src/main/resources/users.txt

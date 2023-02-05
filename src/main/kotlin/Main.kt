@@ -8,12 +8,10 @@ import dev.inmo.tgbotapi.requests.send.SendTextMessage
 import dev.inmo.tgbotapi.types.message.abstracts.CommonMessage
 import dev.inmo.tgbotapi.types.message.content.TextContent
 import dto.User
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import dto.CalendarEvent
-import utils.buildCalendarFileName
-import utils.buildRequestURL
-import utils.downloadFile
-import utils.extractCalendar
+import kotlinx.coroutines.withContext
+import utils.*
 import java.io.File
 
 // Databases are for noobs
@@ -22,6 +20,7 @@ private val users = mutableListOf<User>()
 suspend fun main() {
     val token = File("src/main/resources/token.txt").readText(Charsets.UTF_8)
     val bot = telegramBot(token)
+    readUsers()
 
     bot.buildBehaviourWithLongPolling {
         onCommand("start", requireOnlyCommandInMessage = true) {
@@ -45,6 +44,21 @@ suspend fun main() {
     }.join()
 }
 
+private suspend fun readUsers() {
+    withContext(Dispatchers.IO) {
+        runCatching {
+            File("src/main/resources/users.txt").readLines().forEach {
+                val (id, group) = it.split(" ")
+                users.add(User(id, group))
+            }
+        }.onSuccess {
+            println("Users read successful")
+        }.onFailure {
+            println("Users read fail")
+        }
+    }
+}
+
 private suspend fun sendTodaySchedule(it: CommonMessage<TextContent>) {
     val userId = it.chat.id.toString()
 
@@ -60,25 +74,13 @@ private suspend fun sendTodaySchedule(it: CommonMessage<TextContent>) {
         val calendar = extractCalendar(outputFileName)
         val events = calendar.components
         val parsedEvents = events.map { event -> convertToCalendarEvent(event) }
-        for (item in parsedEvents) {
-            println(item)
-        }
+
     } else {
         SendTextMessage(
             it.chat.id,
             "Ты не ввел свою группу, дурак. Используй команду /setgroup"
         )
     }
-}
-
-private fun convertToCalendarEvent(event: Any?): CalendarEvent {
-    val strEvent = event.toString()
-
-    val name = strEvent.substringAfter("SUMMARY:").substringBefore("\r\n")
-    val begin = strEvent.substringAfter("DTSTART:").substringBefore("\r\n")
-    val end = strEvent.substringAfter("DTEND:").substringBefore("\r\n")
-
-    return CalendarEvent(name = name, begin = begin, end = end)
 }
 
 private suspend fun BehaviourContext.waitForGroup(it: CommonMessage<TextContent>) =
@@ -101,6 +103,7 @@ private fun isUserWithAGroup(userId: String): Boolean {
 private fun updateUserGroup(userId: String, group: String) {
     val existingUser = users.find { user -> (user.id == userId) }
     if (existingUser == null) {
+        File("src/main/resources/users.txt").writeText("$userId $group")
         users.add(User(id = userId, group = group))
     } else {
         existingUser.group = group
