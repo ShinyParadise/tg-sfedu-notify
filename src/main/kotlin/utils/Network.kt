@@ -7,12 +7,18 @@ import java.net.URL
 import java.nio.channels.Channels
 
 fun downloadFile(url: URL, outputFileName: String) {
-    url.openStream().use {
-        Channels.newChannel(it).use { rbc ->
-            FileOutputStream(outputFileName).use { fos ->
-                fos.channel.transferFrom(rbc, 0, Long.MAX_VALUE)
+    runCatching {
+        url.openStream().use {
+            Channels.newChannel(it).use { rbc ->
+                FileOutputStream(outputFileName).use { fos ->
+                    fos.channel.transferFrom(rbc, 0, Long.MAX_VALUE)
+                }
             }
         }
+    }.onSuccess {
+        println("Successful download")
+    }.onFailure {
+        println("Failed download")
     }
 }
 
