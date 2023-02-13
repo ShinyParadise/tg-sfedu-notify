@@ -7,10 +7,13 @@ import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onComman
 import dev.inmo.tgbotapi.requests.send.SendTextMessage
 import dev.inmo.tgbotapi.types.message.abstracts.CommonMessage
 import dev.inmo.tgbotapi.types.message.content.TextContent
+import dto.CalendarEvent
 import dto.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
 import utils.*
 import java.io.File
 
@@ -71,15 +74,23 @@ private suspend fun sendTodaySchedule(it: CommonMessage<TextContent>) {
             downloadFile(url = requestURL, outputFileName = outputFileName)
         }
 
-        val calendar = extractCalendar(outputFileName)
-        val events = calendar.components
-        val parsedEvents = events.map { event -> convertToCalendarEvent(event) }
+        val events = parseTodayEvents(outputFileName)
 
     } else {
         SendTextMessage(
             it.chat.id,
             "Ты не ввел свою группу, дурак. Используй команду /setgroup"
         )
+    }
+}
+
+private suspend fun parseTodayEvents(outputFileName: String): List<CalendarEvent> {
+    val calendar = extractCalendar(outputFileName)
+    val events = calendar.components
+    val calendarEvents = events.map { event -> convertToCalendarEvent(event) }
+
+    return calendarEvents.filter {
+        it.begin.date == LocalDateTime.now()
     }
 }
 
