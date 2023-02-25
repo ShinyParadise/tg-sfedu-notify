@@ -20,9 +20,8 @@ dependencies {
     implementation("dev.inmo:tgbotapi:$tgbotVersion")
 
     implementation("ical4j:ical4j:0.9.20")
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
 
-    testImplementation(kotlin("test"))
+    testImplementation("junit:junit:4.13.2")
 }
 
 tasks.test {
