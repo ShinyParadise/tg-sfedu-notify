@@ -19,6 +19,7 @@ fun downloadFile(url: URL, outputFileName: String) {
         println("Successful download")
     }.onFailure {
         println("Failed download")
+        it.printStackTrace()
     }
 }
 
