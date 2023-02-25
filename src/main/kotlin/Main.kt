@@ -7,18 +7,18 @@ import dev.inmo.tgbotapi.extensions.behaviour_builder.triggers_handling.onComman
 import dev.inmo.tgbotapi.requests.send.SendTextMessage
 import dev.inmo.tgbotapi.types.message.abstracts.CommonMessage
 import dev.inmo.tgbotapi.types.message.content.TextContent
-import dto.CalendarEvent
-import dto.User
+import models.CalendarEvent
+import models.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
+import models.UserContainer
+import models.UserContainerImpl
 import utils.*
 import java.io.File
 
 // Databases are for noobs
-private val users = mutableListOf<User>()
+private val users: UserContainer = UserContainerImpl()
 
 suspend fun main() {
     val token = File("src/main/resources/token.txt").readText(Charsets.UTF_8)
@@ -37,7 +37,7 @@ suspend fun main() {
                 it.chat.id,
                 "Теперь твоя группа - $group."
             )
-            updateUserGroup(it.chat.id.toString(), group)
+            users.updateUserGroup(it.chat.id.toString(), group)
         }
 
         onCommand("today_schedule", requireOnlyCommandInMessage = true) {
@@ -52,7 +52,7 @@ private suspend fun readUsers() {
         runCatching {
             File("src/main/resources/users.txt").readLines().forEach {
                 val (id, group) = it.split(" ")
-                users.add(User(id, group))
+                users.addUsers(User(id, group))
             }
         }.onSuccess {
             println("Users read successful")
@@ -65,8 +65,9 @@ private suspend fun readUsers() {
 private suspend fun sendTodaySchedule(it: CommonMessage<TextContent>) {
     val userId = it.chat.id.toString()
 
-    if (isUserWithAGroup(userId)) {
-        val user = users.find { user -> user.id == userId }!!
+    if (users.isUserWithAGroup(userId)) {
+        val user = users.findUser(userId)!!
+
         val requestURL = buildRequestURL(user)
         val outputFileName = buildCalendarFileName(user.group)
 
@@ -87,11 +88,8 @@ private suspend fun sendTodaySchedule(it: CommonMessage<TextContent>) {
 private suspend fun parseTodayEvents(outputFileName: String): List<CalendarEvent> {
     val calendar = extractCalendar(outputFileName)
     val events = calendar.components
-    val calendarEvents = events.map { event -> convertToCalendarEvent(event) }
 
-    return calendarEvents.filter {
-        it.begin.date == LocalDateTime.now()
-    }
+    return events.mapNotNull { event -> CalendarEvent.from(event) }
 }
 
 private suspend fun BehaviourContext.waitForGroup(it: CommonMessage<TextContent>) =
@@ -101,22 +99,3 @@ private suspend fun BehaviourContext.waitForGroup(it: CommonMessage<TextContent>
             "Введи свою группу как в зачетке."
         )
     ).first().text
-
-private fun isUserWithAGroup(userId: String): Boolean {
-    val existingUser = users.find { it.id == userId }
-    existingUser?.let {
-        return it.group.isNotBlank()
-    }
-
-    return false
-}
-
-private fun updateUserGroup(userId: String, group: String) {
-    val existingUser = users.find { user -> (user.id == userId) }
-    if (existingUser == null) {
-        File("src/main/resources/users.txt").writeText("$userId $group")
-        users.add(User(id = userId, group = group))
-    } else {
-        existingUser.group = group
-    }
-}
