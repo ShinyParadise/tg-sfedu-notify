@@ -16,7 +16,10 @@ class FileManager {
 
     fun changeUserGroup(user: User, newGroup: String) {
         outputFile.forEachLine { line ->
-            if (line.contains(user.id)) line.replace(user.group, newGroup)
+            if (line.contains(user.id)) {
+                line.replace(user.group, newGroup)
+                return@forEachLine
+            }
         }
     }
 }
