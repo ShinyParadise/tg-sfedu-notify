@@ -16,6 +16,7 @@ import models.UserContainer
 import models.UserContainerImpl
 import utils.*
 import java.io.File
+import java.time.LocalDateTime
 
 // Databases are for noobs
 private val users: UserContainer = UserContainerImpl()
@@ -62,8 +63,8 @@ private suspend fun readUsers() {
     }
 }
 
-private suspend fun sendTodaySchedule(it: CommonMessage<TextContent>) {
-    val userId = it.chat.id.toString()
+private suspend fun sendTodaySchedule(messageContext: CommonMessage<TextContent>) {
+    val userId = messageContext.chat.id.toString()
 
     if (users.isUserWithAGroup(userId)) {
         val user = users.findUser(userId)!!
@@ -75,11 +76,19 @@ private suspend fun sendTodaySchedule(it: CommonMessage<TextContent>) {
             downloadFile(url = requestURL, outputFileName = outputFileName)
         }
 
-        val events = parseTodayEvents(outputFileName)
+        var events: List<CalendarEvent> = emptyList()
 
+        runCatching {
+            events = parseTodayEvents(outputFileName)
+        }.onFailure {
+            SendTextMessage(messageContext.chat.id, "Произошла ошибка")
+        }.onSuccess {
+            val message = events.joinToString("\n\n")
+            SendTextMessage(messageContext.chat.id, message)
+        }
     } else {
         SendTextMessage(
-            it.chat.id,
+            messageContext.chat.id,
             "Ты не ввел свою группу, дурак. Используй команду /setgroup"
         )
     }
@@ -88,9 +97,12 @@ private suspend fun sendTodaySchedule(it: CommonMessage<TextContent>) {
 private suspend fun parseTodayEvents(outputFileName: String): List<CalendarEvent> {
     val calendar = extractCalendar(outputFileName)
     val events = calendar.components
+    val calendarEvents = events.mapNotNull { event -> CalendarEvent.from(event) }
 
-    return events.mapNotNull { event -> CalendarEvent.from(event) }
+    return calendarEvents.filter { isToday(it) }
 }
+
+private fun isToday(it: CalendarEvent) = it.begin.dayOfYear == LocalDateTime.now().dayOfYear
 
 private suspend fun BehaviourContext.waitForGroup(it: CommonMessage<TextContent>) =
     waitText(
